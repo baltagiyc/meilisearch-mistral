@@ -17,3 +17,17 @@ python complex_pdf_test/run_pipeline.py complex_pdf_test/mistral-doc.pdf -o out/
 python complex_pdf_test/run_pipeline.py complex_pdf_test/mistral-doc.pdf --load
 ```
 
+## Chat (Option A – Meilisearch native)
+
+After loading chunks into Meilisearch, you can use the **experimental chat** to ask questions in natural language (Meilisearch does retrieval + Mistral LLM).
+
+**Prerequisites:** Meilisearch ≥ v1.15.1 with a master key; `MEILISEARCH_API_KEY` (master) and `MISTRAL_API_KEY` in `.env`.
+
+```bash
+# One-time setup: enable chat, configure index pdf_chunks, create workspace mistral-pdf
+python complex_pdf_test/setup_meilisearch_chat.py
+
+# Ask a question (streaming reply)
+python complex_pdf_test/ask_chat.py "Quelle est l'architecture de Mixtral ?"
+```
+

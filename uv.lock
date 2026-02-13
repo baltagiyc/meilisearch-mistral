@@ -804,6 +804,7 @@ dependencies = [
     { name = "meilisearch" },
     { name = "mistralai" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "tqdm" },
 ]
 
@@ -813,6 +814,7 @@ requires-dist = [
     { name = "meilisearch", specifier = ">=0.40.0" },
     { name = "mistralai", specifier = ">=1.12.2" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "requests", specifier = ">=2.32.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
 ]
 

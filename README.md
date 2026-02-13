@@ -29,6 +29,32 @@ All configuration is read from a `.env` file at the project root. **Do not commi
    - **Local (no auth)** : leave `MEILISEARCH_URL=http://localhost:7700` and `MEILISEARCH_API_KEY=` empty.
    - **Meilisearch Cloud or secured** : set `MEILISEARCH_URL` to your instance URL and `MEILISEARCH_API_KEY` to your key.
 
+## Lancer Meilisearch en local (Docker)
+
+**Meilisearch n’est pas un package Python** : c’est un serveur (comme une base de données). On ne l’installe pas avec `uv` ou `pip`, on le **démarre** (souvent via Docker).
+
+- **Recherche + indexation** : n’importe quelle version récente suffit (ex. `v1.13`).
+- **Chat (Option A)** : il faut **Meilisearch ≥ v1.15.1** (le chat est une feature expérimentale ajoutée dans cette version).
+
+**Pour la recherche seule** (sans chat), une commande suffit :
+
+```bash
+docker run -it --rm -p 7700:7700 getmeili/meilisearch:v1.15.1
+```
+
+**Pour le chat (Option A)** : le serveur **doit** être lancé avec une **master key**, sinon la route chat/completions provoque un panic (bug côté Meilisearch). Utilise par exemple :
+
+```bash
+docker run -it --rm -p 7700:7700 -e MEILI_MASTER_KEY=devMasterKey123456 getmeili/meilisearch:v1.15.1
+```
+
+Et dans ton `.env` ajoute : `MEILISEARCH_API_KEY=devMasterKey123456` (la même valeur que `MEILI_MASTER_KEY`). Ainsi les scripts s’authentifient et le chat peut s’exécuter.
+
+- `7700` : le port attendu par défaut dans `.env`.
+- Sans chat : tu peux laisser `MEILISEARCH_API_KEY` vide et ne pas mettre de master key.
+
+Une fois le serveur démarré, les scripts Python (`uv run python ...`) parlent à Meilisearch via l’URL et la clé configurées dans `.env`.
+
 ## Mistral API key tests
 
 Scripts are grouped in `mistral_key_tests/`:
@@ -37,13 +63,4 @@ Scripts are grouped in `mistral_key_tests/`:
 - `list_models.py`: lists models and shows a capacity heuristic.
 - `list_embedding_models.py`: lists embedding models for RAG.
 
-Run them from the project root:
-
-```bash
-python mistral_key_tests/check_api_key.py
-python mistral_key_tests/list_models.py
-python mistral_key_tests/list_embedding_models.py
-```
-
-Note: capacity in `list_models.py` is an internal heuristic (model name + capability flags), not an official benchmark from Mistral.
 

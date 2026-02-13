@@ -27,7 +27,7 @@ def load_settings() -> Settings:
         mistral_api_key=mistral_api_key,
         mistral_embedding_model=os.getenv("MISTRAL_EMBEDDING_MODEL", "mistral-embed"),
         mistral_chat_model=os.getenv("MISTRAL_CHAT_MODEL", "mistral-large-latest"),
-        meilisearch_url=os.getenv("MEILISEARCH_URL", "http://localhost:7700"),
-        meilisearch_api_key=os.getenv("MEILISEARCH_API_KEY", ""),
+        meilisearch_url=os.getenv("MEILISEARCH_URL", "http://localhost:7700").strip(),
+        meilisearch_api_key=os.getenv("MEILISEARCH_API_KEY", "").strip(),
         meilisearch_index=os.getenv("MEILISEARCH_INDEX", "documents"),
     )

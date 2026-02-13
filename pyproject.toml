@@ -9,5 +9,6 @@ dependencies = [
     "meilisearch>=0.40.0",
     "mistralai>=1.12.2",
     "python-dotenv>=1.2.1",
+    "requests>=2.32.0",
     "tqdm>=4.67.3",
 ]
