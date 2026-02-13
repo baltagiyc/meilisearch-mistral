@@ -1,0 +1,67 @@
+[
+  {
+    "id": 1,
+    "title": "Meilisearch Quick Start",
+    "content": "Meilisearch is a fast and user-friendly search engine focused on relevance, typo tolerance, and developer experience.",
+    "category": "search",
+    "source": "internal_note",
+    "language": "en"
+  },
+  {
+    "id": 2,
+    "title": "Mistral Embeddings Overview",
+    "content": "Mistral embedding models transform text into vectors used for semantic search and retrieval workflows.",
+    "category": "ai",
+    "source": "internal_note",
+    "language": "en"
+  },
+  {
+    "id": 3,
+    "title": "Hybrid Search Principle",
+    "content": "Hybrid search combines lexical ranking and semantic similarity. The semanticRatio setting balances both signals.",
+    "category": "search",
+    "source": "internal_note",
+    "language": "en"
+  },
+  {
+    "id": 4,
+    "title": "Chunking Best Practices",
+    "content": "Chunk long documents into small passages with overlap to improve retrieval quality in RAG systems.",
+    "category": "rag",
+    "source": "internal_note",
+    "language": "en"
+  },
+  {
+    "id": 5,
+    "title": "Pipeline RAG simple",
+    "content": "Une pipeline RAG de base contient ingestion, embeddings, indexation, retrieval puis generation de reponse.",
+    "category": "rag",
+    "source": "internal_note",
+    "language": "fr"
+  },
+  {
+    "id": 6,
+    "title": "Meilisearch Filters",
+    "content": "Use filterableAttributes to enable filtering by category, source, or language at query time.",
+    "category": "search",
+    "source": "internal_note",
+    "language": "en"
+  },
+  {
+    "id": 7,
+    "title": "Embeddings sans LLM",
+    "content": "Pour faire uniquement du retrieval semantique, un modele d embeddings suffit sans modele generatif de chat.",
+    "category": "ai",
+    "source": "internal_note",
+    "language": "fr"
+  },
+  {
+    "id": 8,
+    "title": "CSV to JSON mapping",
+    "content": "A CSV row can be converted to one JSON document with stable id, normalized text fields, and metadata.",
+    "category": "data",
+    "source": "internal_note",
+    "language": "en"
+  }
+]
+
