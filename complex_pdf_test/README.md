@@ -1,6 +1,8 @@
 # Complex PDF Test
 
-End-to-end test with rich PDFs (text, tables, figures). Pipeline: parse (Docling) → normalize → chunk → build JSON → optionally load into Meilisearch (index `pdf_chunks`) with Mistral embedder.
+End-to-end test with **real PDFs** (text, tables, figures) for the Meilisearch + Mistral due diligence. The simple SDK test uses pre-built JSON and does not validate PDF parsing, chunking, or behaviour on complex layout. This folder runs a full chain: **parse → normalize → chunk → index → (optional) native chat**, so we can check whether hybrid search and Meilisearch’s experimental chat hold up on a realistic document (e.g. the Mixtral paper). For the full assessment, difficulties, and conclusions, see [BILAN.md](BILAN.md).
+
+**What’s in this folder:** parse (Docling) → normalize → chunk → build JSON → optionally load into Meilisearch (index `pdf_chunks`) with Mistral embedder.
 
 **Layout:**
 - **pipeline/** — parse, normalize, chunk, build, schemas (PDF → list of chunk dicts)
@@ -34,12 +36,12 @@ After loading chunks into Meilisearch, use the **experimental chat** to ask ques
 python complex_pdf_test/chat/setup_meilisearch_chat.py
 
 # Ask a question (streaming reply)
-python complex_pdf_test/chat/ask_chat.py "Quelle est l'architecture de Mixtral ?"
+python complex_pdf_test/chat/ask_chat.py "What is Mixtral's architecture?"
 ```
 
 ## Audit (which chunks are retrieved)
 
 ```bash
-python complex_pdf_test/audit/search_chunks_for_query.py "Ta question" [--limit N]
+python complex_pdf_test/audit/search_chunks_for_query.py "Your question" [--limit N]
 ```
 

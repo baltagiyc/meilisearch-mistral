@@ -1,180 +1,180 @@
-# Bilan exhaustif — Complex PDF Test & Chat (Option A)
+# Full assessment — Complex PDF Test & Chat (Option A)
 
-## Conclusion courte
+## Short conclusion
 
-On a mis en place un **pipeline PDF → chunks → Meilisearch (embedder Mistral)**, puis le **chat natif Meilisearch (Option A)** en s’appuyant sur la **feature expérimentale** `chatCompletions`. Sur un PDF technique réel (paper Mixtral 8x7B), le système répond correctement à quatre questions ciblées (architecture, benchmarks, routing, français), avec **recherche hybride** (keyword + sémantique). La due diligence en sort renforcée : on a validé la stack sur un cas réaliste et identifié les contraintes (version, master key, baseUrl Mistral, pas de SDK chat dédié). Les difficultés rencontrées (panic, mauvais provider, 401) sont documentées et corrigées dans les scripts ; le bilan est **positif pour un PoC**, avec des réserves claires sur le caractère expérimental et la maturité opérationnelle.
-
----
-
-## 1. Objectifs : pourquoi on a fait ça
-
-### 1.1 Tester la phase experimental-features
-
-- La doc Meilisearch qualifie le **chat** de feature **expérimentale** (`chatCompletions`), activable via `PATCH /experimental-features`.
-- Objectif : vérifier en conditions réelles si cette feature est **utilisable** dans un scénario RAG (index de chunks, LLM Mistral), et si elle apporte une vraie valeur (réponses fondées sur les chunks, pas de hallucination grossière).
-- Enjeu due diligence : savoir si on peut recommander ou non de s’appuyer sur cette brique pour un projet (avec les précautions qui s’imposent).
-
-### 1.2 Voir les performances sur un vrai PDF
-
-- Les tests “simple” (ex. `simple_sdk_test/`) utilisent des JSONs préconstruits ; ils ne valident pas le **parsing PDF**, le **chunking** ni le comportement sur **tableaux / sections / figures**.
-- Objectif : utiliser un **PDF technique réel** (paper Mixtral of Experts, ~2,4 Mo, tableaux, benchmarks, formules, plusieurs sections) pour évaluer :
-  - la chaîne **parse → normalize → chunk → index** ;
-  - la **qualité de la recherche** (hybrid) et de la **réponse du chat** sur des questions précises (chiffres, nuances sémantiques, tableaux).
-- Enjeu due diligence : répondre à la question “Meilisearch + Mistral, ça tient la route sur un document complexe ou pas ?”.
-
-### 1.3 Répondre aux questions de la due diligence de base
-
-Le repo est dédié à un **audit / due diligence Meilisearch + Mistral** (hybrid search, RAG). Ce qu’on a fait dans `complex_pdf_test/` contribue directement à :
-
-| Question due diligence | Ce que le complex PDF test apporte |
-|------------------------|------------------------------------|
-| **Hybrid search en conditions réelles** | Index `pdf_chunks` avec embedder Mistral ; recherche hybride (keyword + semantic) utilisée par le chat ; script `search_chunks_for_query.py` pour inspecter les chunks retournés. |
-| **RAG “clé en main” vs bricolage** | Option A (chat natif) = un seul appel API, Meilisearch gère retrieval + appel LLM ; on a mesuré que les réponses sont ancrées dans le document (4 questions ciblées validées). |
-| **Maturité / risques des features expérimentales** | Activation `chatCompletions`, bugs rencontrés (panic sans master key, baseUrl obligatoire pour Mistral), absence de wrapper SDK chat : on documente le coût et les contournements. |
-| **Qualité sur PDFs complexes** | Un vrai paper avec tableaux et sections ; validation que les chiffres (GSM8K, Humaneval, Table 4 FR) et les nuances (routing non spécialisé par domaine) sont correctement récupérés. |
-| **Intégration Mistral (embedding + chat)** | Embedding Mistral pour les chunks ; chat configuré avec source Mistral + baseUrl pour éviter le routage vers OpenAI ; une seule stack cohérente. |
+We set up a **PDF → chunks → Meilisearch (Mistral embedder) pipeline**, then **native Meilisearch chat (Option A)** using the **experimental** `chatCompletions` feature. On a real technical PDF (Mixtral 8x7B paper), the system correctly answers four targeted questions (architecture, benchmarks, routing, French), with **hybrid search** (keyword + semantic). The due diligence is strengthened: we validated the stack on a realistic case and identified constraints (version, master key, Mistral baseUrl, no dedicated chat SDK). The issues encountered (panic, wrong provider, 401) are documented and fixed in the scripts; the assessment is **positive for a PoC**, with clear caveats on the experimental nature and operational maturity.
 
 ---
 
-## 2. Ce qui a été mis en place (point par point)
+## 1. Objectives: why we did this
 
-### 2.1 Pipeline PDF → chunks → JSON
+### 1.1 Test the experimental-features phase
 
-| Fichier | Rôle | Pourquoi |
-|---------|------|----------|
-| **parse_pdf.py** | Utilise **Docling** pour convertir le PDF en markdown (layout, tableaux, texte). | Avoir une représentation structurée du PDF pour chunker proprement (sections, paragraphes) au lieu de couper au caractère. |
-| **normalize_elements.py** | Normalisation du texte (espaces, retours à la ligne) via regex. | Réduire le bruit et les variations d’espaces avant chunking et indexation. |
-| **chunk_pdf.py** | Découpage par titres `##` / `###`, puis par taille (max_chars, overlap). | Éviter de couper au milieu d’une phrase ou d’un tableau ; garder des unités sémantiques (sections) quand c’est possible. |
-| **build_documents.py** | Construit la liste de documents (chunks) au format cible. | Unifier le format (id, doc_id, chunk_text, title, page, element_type, source_file) pour l’export JSON et Meilisearch. |
-| **schemas.py** | Définit `RawElement`, `Chunk`, `chunk_to_meilisearch_doc`. | Typage et cohérence des structures dans tout le pipeline. |
-| **run_pipeline.py** | Orchestre parse → normalize → chunk → build → écriture JSON ; option `--load` pour pousser vers Meilisearch. | Un seul point d’entrée pour reproduire l’expérience et charger l’index. |
+- Meilisearch docs describe **chat** as an **experimental** feature (`chatCompletions`), enabled via `PATCH /experimental-features`.
+- Goal: check in real conditions whether this feature is **usable** in a RAG scenario (chunk index, Mistral LLM), and whether it adds real value (answers grounded in chunks, no gross hallucination).
+- Due diligence stake: decide whether to recommend relying on this building block for a project (with the right precautions).
 
-**Document de test :** `mistral-doc.pdf` (paper Mixtral of Experts).  
-**Sortie :** `mistral-doc.chunks.json` (43 chunks). Observations déjà notées : premier chunk parfois bruit (noms d’auteurs), légendes de figures dans le texte, `page` souvent null ; on a gardé tel quel pour le rapport.
+### 1.2 See performance on a real PDF
 
-### 2.2 Chargement dans Meilisearch (index `pdf_chunks`)
+- “Simple” tests (e.g. `simple_sdk_test/`) use pre-built JSONs; they do not validate **PDF parsing**, **chunking**, or behaviour on **tables / sections / figures**.
+- Goal: use a **real technical PDF** (Mixtral of Experts paper, ~2.4 MB, tables, benchmarks, formulas, multiple sections) to evaluate:
+  - the **parse → normalize → chunk → index** chain;
+  - **search quality** (hybrid) and **chat response** on precise questions (numbers, semantic nuance, tables).
+- Due diligence stake: answer “Does Meilisearch + Mistral hold up on a complex document or not?”.
 
-| Fichier | Rôle | Pourquoi |
-|---------|------|----------|
-| **load_to_meilisearch.py** | Configure l’index `pdf_chunks` (searchable: `chunk_text`, `title` ; filterable: `doc_id`, `page`, etc.) et enregistre l’**embedder Mistral** (REST, dimensions 1024, documentTemplate pour l’embedding). Puis ajoute les documents. | Permettre la **recherche hybride** (keyword + semantic) ; les embeddings sont calculés côté Meilisearch via l’API Mistral. |
+### 1.3 Answer base due diligence questions
 
-L’index est donc prêt pour la recherche full-text et sémantique, avec le même modèle Mistral que pour le chat.
+The repo is dedicated to a **Meilisearch + Mistral audit / due diligence** (hybrid search, RAG). What we did in `complex_pdf_test/` directly contributes to:
 
-### 2.3 Chat natif Meilisearch (Option A — experimental)
-
-| Fichier | Rôle | Pourquoi |
-|---------|------|----------|
-| **setup_meilisearch_chat.py** | 1) Active la feature expérimentale `chatCompletions` (PATCH `/experimental-features`). 2) Configure l’index `pdf_chunks` pour le chat (description, documentTemplate Liquid, documentTemplateMaxBytes). 3) Crée/met à jour le workspace **mistral-pdf** (source Mistral, apiKey, **baseUrl** `https://api.mistral.ai/v1`, prompts système). | Sans ce setup, le chat n’existe pas (feature désactivée), l’index n’est pas “chat-aware”, et le LLM ne serait pas Mistral (sans baseUrl, Meilisearch a routé vers OpenAI dans nos tests). |
-| **ask_chat.py** | Envoie une question en POST `/chats/mistral-pdf/chat/completions` (stream: true), parse le flux SSE (format OpenAI-like), affiche le contenu et gère les erreurs (events avec `error`). Option `--debug` pour inspecter la structure des chunks SSE. | Permettre d’interroger le document en langage naturel et d’obtenir une réponse synthétique au lieu de seulement une liste de hits. |
-| **search_chunks_for_query.py** | Lance une **recherche hybride** (même paramètres que ce que le chat utilise en interne) sur `pdf_chunks` et affiche les chunks retournés (id, title, extrait chunk_text). | Comme le chat ne renvoie pas les sources (tools désactivés), ce script sert de **proxy** pour voir “quels chunks ont été (ou auraient été) envoyés au LLM”. |
-
-**Mode de search effectivement utilisé par le chat :** **hybrid** (keyword + semantic, embedder `mistral`). Les chunks renvoyés au LLM sont ceux de cette recherche hybride, formatés selon le `documentTemplate` configuré dans le chat de l’index.
+| Due diligence question | What the complex PDF test provides |
+|------------------------|-------------------------------------|
+| **Hybrid search in real conditions** | Index `pdf_chunks` with Mistral embedder; hybrid search (keyword + semantic) used by chat; script `search_chunks_for_query.py` to inspect returned chunks. |
+| **“Turnkey” RAG vs DIY** | Option A (native chat) = single API call, Meilisearch handles retrieval + LLM call; we verified that answers are grounded in the document (4 targeted questions validated). |
+| **Maturity / risks of experimental features** | Enabling `chatCompletions`, bugs encountered (panic without master key, baseUrl required for Mistral), no chat SDK wrapper: we document the cost and workarounds. |
+| **Quality on complex PDFs** | A real paper with tables and sections; validation that numbers (GSM8K, Humaneval, Table 4 FR) and nuance (routing not domain-specialized) are correctly retrieved. |
+| **Mistral integration (embedding + chat)** | Mistral embedding for chunks; chat configured with Mistral source + baseUrl to avoid routing to OpenAI; a single coherent stack. |
 
 ---
 
-## 3. Difficultés observées (être critique)
+## 2. What was implemented (point by point)
 
-### 3.1 Version et activation du chat
+### 2.1 PDF → chunks → JSON pipeline
 
-- **Meilisearch &lt; v1.15.1** : la route `/experimental-features` renvoie **400** pour `chatCompletions` (feature inexistante ou non activable). Il a fallu **mettre à jour l’image Docker** (v1.13 → v1.15.1).
-- **Impact** : en prod ou en CI, il faut figer une version ≥ v1.15.1 et documenter la dépendance.
+| File | Role | Why |
+|------|------|-----|
+| **parse_pdf.py** | Uses **Docling** to convert PDF to markdown (layout, tables, text). | Get a structured representation of the PDF for clean chunking (sections, paragraphs) instead of character-level splits. |
+| **normalize_elements.py** | Text normalization (spaces, line breaks) via regex. | Reduce noise and spacing variation before chunking and indexing. |
+| **chunk_pdf.py** | Split by `##` / `###` headers, then by size (max_chars, overlap). | Avoid cutting mid-sentence or mid-table; keep semantic units (sections) when possible. |
+| **build_documents.py** | Builds the list of documents (chunks) in the target format. | Unify format (id, doc_id, chunk_text, title, page, element_type, source_file) for JSON export and Meilisearch. |
+| **schemas.py** | Defines `RawElement`, `Chunk`, `chunk_to_meilisearch_doc`. | Typing and consistency of structures across the pipeline. |
+| **run_pipeline.py** | Orchestrates parse → normalize → chunk → build → JSON write; `--load` option to push to Meilisearch. | Single entry point to reproduce the flow and load the index. |
 
-### 3.2 Panic côté serveur (Rust unwrap on None)
+**Test document:** `mistral-doc.pdf` (Mixtral of Experts paper).  
+**Output:** `mistral-doc.chunks.json` (43 chunks). Notes: first chunk sometimes noisy (author names), figure captions in text, `page` often null; we left as-is for the report.
 
-- En **v1.15** et **v1.15.1**, sans **master key** : le serveur **panic** (e.g. `chat_completions.rs:446`, `Option::unwrap()` on `None`) lors d’un appel à `/chat/.../completions`. La doc évoque une “Default Chat API Key” créée quand une master key est présente ; sans elle, le code suppose une clé et plante.
-- **Contournement** : lancer Meilisearch avec une **master key** (≥ 16 caractères) et utiliser la **même valeur** dans `.env` (`MEILISEARCH_API_KEY`). On a rendu la clé **obligatoire** dans `setup_meilisearch_chat.py` et `ask_chat.py` pour le chat.
-- **Critique** : une feature expérimentale ne devrait pas faire planter le processus ; c’est un risque pour la maturité.
+### 2.2 Loading into Meilisearch (index `pdf_chunks`)
 
-### 3.3 Routage vers le mauvais provider (OpenAI au lieu de Mistral)
+| File | Role | Why |
+|------|------|-----|
+| **load_to_meilisearch.py** | Configures index `pdf_chunks` (searchable: `chunk_text`, `title`; filterable: `doc_id`, `page`, etc.) and registers the **Mistral embedder** (REST, 1024 dimensions, documentTemplate for embedding). Then adds documents. | Enable **hybrid search** (keyword + semantic); embeddings are computed by Meilisearch via the Mistral API. |
 
-- Sans **baseUrl** dans le workspace, Meilisearch envoyait les requêtes chat vers **OpenAI** ; l’erreur renvoyée était “Incorrect API key... platform.openai.com” alors qu’on avait configuré une clé Mistral.
-- **Contournement** : ajout explicite de **`baseUrl": "https://api.mistral.ai/v1"`** dans le workspace. Après re-setup, le chat a bien utilisé Mistral et renvoyé des réponses correctes.
-- **Critique** : le comportement par défaut (sans baseUrl) est trompeur ; la doc pourrait mieux préciser que pour Mistral, fixer la baseUrl est fortement recommandé.
+The index is ready for full-text and semantic search with the same Mistral model as for chat.
 
-### 3.4 Outils du chat (Progress / Sources) désactivés
+### 2.3 Native Meilisearch chat (Option A — experimental)
 
-- L’envoi du paramètre **`tools`** (e.g. `_meiliSearchProgress`, `_meiliSearchSources`) provoquait un **panic** (unwrap on None) en v1.15. On a donc **retiré** `tools` du body dans `ask_chat.py`.
-- **Conséquence** : pas de **sources** (chunks) dans la réponse du chat ; on ne voit pas explicitement “ce passage vient du chunk X”. Pour l’audit, on compense avec `search_chunks_for_query.py`.
-- **Critique** : pour un usage “sérieux” (traçabilité, conformité), l’affichage des sources est important ; la stabilité des tools expérimentaux est à surveiller.
+| File | Role | Why |
+|------|------|-----|
+| **setup_meilisearch_chat.py** | 1) Enables experimental feature `chatCompletions` (PATCH `/experimental-features`). 2) Configures index `pdf_chunks` for chat (description, documentTemplate Liquid, documentTemplateMaxBytes). 3) Creates/updates workspace **mistral-pdf** (Mistral source, apiKey, **baseUrl** `https://api.mistral.ai/v1`, system prompts). | Without this setup, chat does not exist (feature off), the index is not “chat-aware”, and the LLM would not be Mistral (without baseUrl, Meilisearch routed to OpenAI in our tests). |
+| **ask_chat.py** | Sends a question via POST `/chats/mistral-pdf/chat/completions` (stream: true), parses the SSE stream (OpenAI-like format), prints content and handles errors (events with `error`). `--debug` option to inspect SSE chunk structure. | Allow querying the document in natural language and getting a synthetic answer instead of only a list of hits. |
+| **search_chunks_for_query.py** | Runs **hybrid search** (same parameters as chat uses internally) on `pdf_chunks` and prints returned chunks (id, title, chunk_text excerpt). | Since chat does not return sources (tools disabled), this script acts as a **proxy** to see “which chunks were (or would have been) sent to the LLM”. |
 
-### 3.5 Erreurs de script et de configuration
-
-- **401 sur GET /version** : dans `setup_meilisearch_chat.py`, l’appel à `/version` ne passait pas les **headers** (Authorization). Corrigé en ajoutant `headers=headers`.
-- **Clé API vide ou incorrecte** : si la master key fait &lt; 16 caractères, Meilisearch en génère une autre et l’affiche ; si `.env` garde l’ancienne, **403 invalid_api_key**. Il a fallu documenter “même valeur dans docker run et MEILISEARCH_API_KEY”, et ajouter un `.strip()` sur la clé dans `config/settings.py` pour éviter les espaces parasites.
-- **Chargement du .env** : selon le répertoire de travail, `load_dotenv()` ne trouvait pas le `.env`. On a ajouté **`load_dotenv(PROJECT_ROOT / ".env")`** dans `setup_meilisearch_chat.py` et `ask_chat.py` pour forcer le chargement depuis la racine du projet.
-
-### 3.6 Affichage (encodage)
-
-- En sortie terminal, les caractères accentués peuvent s’afficher en **mojibake** (e.g. `Ã©` au lieu de `é`). Le contenu reçu est bien en UTF-8 ; le problème est côté environnement d’affichage (terminal/IDE). Pas de correctif dans le code pour l’instant.
-
----
-
-## 4. Procédure suivie (comment on a procédé)
-
-1. **Pipeline PDF** : mise en place de parse (Docling) → normalize → chunk (par sections puis taille/overlap) → build → JSON. Exécution sur `mistral-doc.pdf` et vérification du fichier de chunks.
-2. **Indexation** : configuration de l’index `pdf_chunks` (searchable, filterable, embedder Mistral) et chargement des 43 chunks via `run_pipeline.py --load`.
-3. **Chat** : lecture de la doc Meilisearch (experimental-features, chats, workspace, stream completions). Implémentation de `setup_meilisearch_chat.py` et `ask_chat.py` en Python (pas de curl manuel).
-4. **Dépannage** : 400 → upgrade Docker en v1.15.1 ; panic → activation de la master key et alignement `.env` ; réponse vide → debug SSE → détection de l’erreur “OpenAI” → ajout de `baseUrl` Mistral ; 401 → ajout des headers sur `/version` ; 403 → clarification clé master et `.strip()`.
-5. **Validation** : quatre questions ciblées (architecture 47B/13B, benchmarks GSM8K/Humaneval, spécialisation des experts, benchmarks FR Table 4) ; toutes ont reçu des réponses correctes et ancrées dans le document.
-6. **Transparence** : ajout de `search_chunks_for_query.py` pour montrer le **mode de search** (hybrid) et les **chunks** retournés pour une requête donnée (proxy des chunks envoyés au LLM).
+**Search mode actually used by chat:** **hybrid** (keyword + semantic, embedder `mistral`). Chunks sent to the LLM are from this hybrid search, formatted per the index chat `documentTemplate`.
 
 ---
 
-## 5. Points positifs
+## 3. Difficulties observed (critical view)
 
-- **Option A opérationnelle** : un seul appel API (chat completions) pour avoir une réponse RAG ; pas besoin de coder la boucle search → prompt → LLM soi-même.
-- **Résultats sur un vrai PDF** : 4/4 questions validées (précision technique, tableaux, nuance sémantique, français) ; les tableaux et chiffres sont bien extraits et restitués.
-- **Recherche hybride** : combinaison keyword + semantic (Mistral) ; les bons passages sont retrouvés (sections, tableaux, conclusion).
-- **Stack cohérente** : un seul embedder (Mistral) pour l’index et un seul LLM (Mistral) pour le chat ; configuration centralisée (`.env`, `config/settings.py`).
-- **Scripts reproductibles** : tout est faisable depuis le repo (setup, pipeline, ask, search_chunks_for_query) ; pas de dépendance à une UI Meilisearch.
-- **Documentation des pièges** : version, master key, baseUrl, tools, 401/403 sont documentés dans le README et les commentaires ; un nouvel utilisateur peut éviter les mêmes erreurs.
-- **Due diligence** : on a une preuve concrète que “Meilisearch + Mistral” peut servir de base à un RAG conversationnel sur un document technique complexe, avec une liste claire de limites et de prérequis.
+### 3.1 Version and enabling chat
+
+- **Meilisearch &lt; v1.15.1**: the `/experimental-features` route returns **400** for `chatCompletions` (feature missing or not enableable). We had to **upgrade the Docker image** (v1.13 → v1.15.1).
+- **Impact**: in prod or CI, pin a version ≥ v1.15.1 and document the dependency.
+
+### 3.2 Server panic (Rust unwrap on None)
+
+- In **v1.15** and **v1.15.1**, **without a master key**: the server **panics** (e.g. `chat_completions.rs:446`, `Option::unwrap()` on `None`) on a call to `/chat/.../completions`. The docs mention a “Default Chat API Key” created when a master key is present; without it, the code assumes a key and crashes.
+- **Workaround**: run Meilisearch with a **master key** (≥ 16 characters) and use the **same value** in `.env` (`MEILISEARCH_API_KEY`). We made the key **required** in `setup_meilisearch_chat.py` and `ask_chat.py` for chat.
+- **Criticism**: an experimental feature should not crash the process; this is a maturity risk.
+
+### 3.3 Routing to the wrong provider (OpenAI instead of Mistral)
+
+- Without **baseUrl** in the workspace, Meilisearch sent chat requests to **OpenAI**; the error was “Incorrect API key... platform.openai.com” even though we had configured a Mistral key.
+- **Workaround**: explicitly add **`baseUrl": "https://api.mistral.ai/v1"`** in the workspace. After re-setup, chat correctly used Mistral and returned correct answers.
+- **Criticism**: default behaviour (no baseUrl) is misleading; docs could better state that for Mistral, setting baseUrl is strongly recommended.
+
+### 3.4 Chat tools (Progress / Sources) disabled
+
+- Sending the **`tools`** parameter (e.g. `_meiliSearchProgress`, `_meiliSearchSources`) caused a **panic** (unwrap on None) in v1.15. We therefore **removed** `tools` from the body in `ask_chat.py`.
+- **Consequence**: no **sources** (chunks) in the chat response; we do not see explicitly “this passage comes from chunk X”. For audit we compensate with `search_chunks_for_query.py`.
+- **Criticism**: for “serious” use (traceability, compliance), showing sources matters; stability of experimental tools should be monitored.
+
+### 3.5 Script and configuration errors
+
+- **401 on GET /version**: in `setup_meilisearch_chat.py`, the `/version` call did not send **headers** (Authorization). Fixed by adding `headers=headers`.
+- **Empty or wrong API key**: if the master key is &lt; 16 characters, Meilisearch generates another and prints it; if `.env` keeps the old one, **403 invalid_api_key**. We documented “same value in docker run and MEILISEARCH_API_KEY”, and added `.strip()` on the key in `config/settings.py` to avoid stray spaces.
+- **Loading .env**: depending on working directory, `load_dotenv()` did not find `.env`. We added **`load_dotenv(PROJECT_ROOT / ".env")`** in `setup_meilisearch_chat.py` and `ask_chat.py` to force loading from project root.
+
+### 3.6 Display (encoding)
+
+- In terminal output, accented characters may show as **mojibake** (e.g. `Ã©` instead of `é`). The received content is valid UTF-8; the issue is on the display environment (terminal/IDE). No code fix for now.
 
 ---
 
-## 6. Points négatifs
+## 4. Procedure followed (how we proceeded)
 
-- **Feature expérimentale** : chat non stabilisé (panics, comportement par défaut trompeur) ; évolutions possibles de l’API ; à utiliser en connaissance de cause.
-- **Pas de SDK chat** : pas de méthode dédiée dans le SDK Python ; tout passe par des appels HTTP (requests) et le parsing manuel du stream SSE.
-- **Master key obligatoire pour le chat** : en local “sans auth” on ne peut pas utiliser le chat ; obligation de gérer une clé (≥ 16 caractères) et de la garder en sync entre Docker et `.env`.
-- **Pas de sources dans la réponse** : les tools (dont _meiliSearchSources) sont désactivés ; on ne voit pas les chunks exacts envoyés au LLM dans la réponse du chat (seulement via le script proxy).
-- **Un seul document testé** : un seul PDF (paper Mixtral) ; pas de variété de formats (rapports, slides, multi-langues) ni de volume.
-- **Dépendance version Meilisearch** : besoin de v1.15.1+ ; toute infra ou doc doit le préciser.
-- **Encodage affichage** : mojibake possible en sortie terminal ; cosmétique mais à noter.
+1. **PDF pipeline**: set up parse (Docling) → normalize → chunk (by sections then size/overlap) → build → JSON. Run on `mistral-doc.pdf` and check chunk file.
+2. **Indexing**: configure index `pdf_chunks` (searchable, filterable, Mistral embedder) and load 43 chunks via `run_pipeline.py --load`.
+3. **Chat**: read Meilisearch docs (experimental-features, chats, workspace, stream completions). Implement `setup_meilisearch_chat.py` and `ask_chat.py` in Python (no manual curl).
+4. **Troubleshooting**: 400 → upgrade Docker to v1.15.1; panic → enable master key and align `.env`; empty response → debug SSE → spot “OpenAI” error → add Mistral `baseUrl`; 401 → add headers on `/version`; 403 → clarify master key and `.strip()`.
+5. **Validation**: four targeted questions (47B/13B architecture, GSM8K/Humaneval benchmarks, expert specialization, FR Table 4 benchmarks); all received correct, document-grounded answers.
+6. **Transparency**: added `search_chunks_for_query.py` to show **search mode** (hybrid) and **chunks** returned for a given query (proxy for chunks sent to the LLM).
 
 ---
 
-## 7. Récapitulatif des fichiers `complex_pdf_test/`
+## 5. Positive points
 
-| Dossier / Fichier | Type | Rôle en une phrase |
-|-------------------|------|--------------------|
-| **pipeline/** | | PDF → list de chunk dicts |
+- **Option A operational**: single API call (chat completions) for a RAG answer; no need to code the search → prompt → LLM loop yourself.
+- **Results on a real PDF**: 4/4 questions validated (technical accuracy, tables, semantic nuance, French); tables and numbers are correctly extracted and restituted.
+- **Hybrid search**: keyword + semantic (Mistral); the right passages are retrieved (sections, tables, conclusion).
+- **Coherent stack**: one embedder (Mistral) for the index and one LLM (Mistral) for chat; centralized config (`.env`, `config/settings.py`).
+- **Reproducible scripts**: everything can be run from the repo (setup, pipeline, ask, search_chunks_for_query); no dependency on a Meilisearch UI.
+- **Documented pitfalls**: version, master key, baseUrl, tools, 401/403 are documented in README and comments; a new user can avoid the same errors.
+- **Due diligence**: concrete evidence that “Meilisearch + Mistral” can support conversational RAG on a complex technical document, with a clear list of limits and prerequisites.
+
+---
+
+## 6. Negative points
+
+- **Experimental feature**: chat not stabilized (panics, misleading defaults); API may change; use with full awareness.
+- **No chat SDK**: no dedicated method in the Python SDK; everything goes through HTTP calls (requests) and manual SSE stream parsing.
+- **Master key required for chat**: in local “no auth” mode you cannot use chat; you must manage a key (≥ 16 chars) and keep it in sync between Docker and `.env`.
+- **No sources in the response**: tools (including _meiliSearchSources) are disabled; you do not see the exact chunks sent to the LLM in the chat response (only via the proxy script).
+- **Single test document**: one PDF (Mixtral paper); no variety of formats (reports, slides, multi-language) or volume.
+- **Meilisearch version dependency**: need v1.15.1+; any infra or docs must state this.
+- **Display encoding**: possible mojibake in terminal output; cosmetic but worth noting.
+
+---
+
+## 7. File summary for `complex_pdf_test/`
+
+| Folder / File | Type | One-line role |
+|---------------|------|----------------|
+| **pipeline/** | | PDF → list of chunk dicts |
 | pipeline/parse_pdf.py | Pipeline | PDF → markdown via Docling. |
-| pipeline/normalize_elements.py | Pipeline | Normalisation du texte (regex). |
-| pipeline/chunk_pdf.py | Pipeline | Découpage par sections puis par taille/overlap. |
-| pipeline/build_documents.py | Pipeline | Construction des docs (chunks) au format cible. |
-| pipeline/schemas.py | Données | Modèles RawElement, Chunk, chunk_to_meilisearch_doc. |
-| **load/** | | Indexation Meilisearch |
-| load/load_to_meilisearch.py | Indexation | Configure `pdf_chunks` (embedder Mistral) et charge les documents. |
-| **chat/** | | Chat natif (Option A) |
-| chat/setup_meilisearch_chat.py | Chat | Active chatCompletions, configure l’index pour le chat, crée le workspace Mistral (avec baseUrl). |
-| chat/ask_chat.py | Chat | Envoie une question au chat, parse le stream SSE, affiche la réponse. |
+| pipeline/normalize_elements.py | Pipeline | Text normalization (regex). |
+| pipeline/chunk_pdf.py | Pipeline | Split by sections then by size/overlap. |
+| pipeline/build_documents.py | Pipeline | Build documents (chunks) in target format. |
+| pipeline/schemas.py | Data | RawElement, Chunk, chunk_to_meilisearch_doc. |
+| **load/** | | Meilisearch indexing |
+| load/load_to_meilisearch.py | Indexing | Configure `pdf_chunks` (Mistral embedder) and load documents. |
+| **chat/** | | Native chat (Option A) |
+| chat/setup_meilisearch_chat.py | Chat | Enable chatCompletions, configure index for chat, create Mistral workspace (with baseUrl). |
+| chat/ask_chat.py | Chat | Send question to chat, parse SSE stream, print response. |
 | **audit/** | | Inspection |
-| audit/search_chunks_for_query.py | Audit | Lance une recherche hybride (même logique que le chat) et affiche les chunks retournés. |
-| **run_pipeline.py** | Orchestration | Enchaîne parse → normalize → chunk → build → JSON ; option `--load` pour Meilisearch. |
-| **mistral-doc.pdf** | Donnée | PDF de test (paper Mixtral of Experts). |
-| **mistral-doc.chunks.json** | Donnée | Sortie du pipeline (43 chunks). |
-| **README.md** | Doc | Instructions et layout (pipeline, load, chat, audit). |
-| **BILAN.md** | Doc | Ce document. |
+| audit/search_chunks_for_query.py | Audit | Run hybrid search (same as chat) and print returned chunks. |
+| **run_pipeline.py** | Orchestration | parse → normalize → chunk → build → JSON; `--load` for Meilisearch. |
+| **mistral-doc.pdf** | Data | Test PDF (Mixtral of Experts paper). |
+| **mistral-doc.chunks.json** | Data | Pipeline output (43 chunks). |
+| **README.md** | Doc | Instructions and layout (pipeline, load, chat, audit). |
+| **BILAN.md** | Doc | This document. |
 
 ---
 
-## 8. Synthèse par rapport à la due diligence
+## 8. Summary vs due diligence
 
-- **Hybrid search** : validé sur un index de chunks réels (Mistral embedder) ; le chat s’appuie bien sur cette recherche.
-- **RAG “natif”** : Option A testée de bout en bout ; réponses pertinentes et ancrées dans le document.
-- **Feature expérimentale** : utilisable sous conditions (version, master key, baseUrl) ; les difficultés et contournements sont documentés.
-- **Performance sur PDF complexe** : un paper avec tableaux et sections a été traité avec succès (chiffres, nuances, français).
-- **Intégration Mistral** : embedding + chat ; une seule stack, configuration explicite (baseUrl) pour éviter les mauvais routages.
+- **Hybrid search**: validated on a real chunk index (Mistral embedder); chat correctly relies on it.
+- **“Native” RAG**: Option A tested end-to-end; relevant, document-grounded answers.
+- **Experimental feature**: usable under conditions (version, master key, baseUrl); difficulties and workarounds are documented.
+- **Performance on complex PDF**: a paper with tables and sections was processed successfully (numbers, nuance, French).
+- **Mistral integration**: embedding + chat; single stack, explicit config (baseUrl) to avoid wrong routing.
 
-Ce bilan peut servir de **base factuelle** pour la partie “tests sur document réel” et “chat expérimental” du rapport de due diligence, en citant à la fois les résultats positifs et les réserves listées ci-dessus.
+This assessment can serve as a **factual basis** for the “tests on real document” and “experimental chat” parts of the due diligence report, citing both the positive results and the caveats listed above.
