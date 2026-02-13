@@ -1,4 +1,4 @@
-# Full assessment — Complex PDF Test & Chat (Option A)
+# Full assessment — Complex PDF Test & Chat (Experimental Feature)
 
 ## Short conclusion
 
@@ -29,7 +29,7 @@ The repo is dedicated to a **Meilisearch + Mistral audit / due diligence** (hybr
 | Due diligence question | What the complex PDF test provides |
 |------------------------|-------------------------------------|
 | **Hybrid search in real conditions** | Index `pdf_chunks` with Mistral embedder; hybrid search (keyword + semantic) used by chat; script `search_chunks_for_query.py` to inspect returned chunks. |
-| **“Turnkey” RAG vs DIY** | Option A (native chat) = single API call, Meilisearch handles retrieval + LLM call; we verified that answers are grounded in the document (4 targeted questions validated). |
+| **“Turnkey” RAG vs DIY** | Native Chat = single API call, Meilisearch handles retrieval + LLM call; we verified that answers are grounded in the document (4 targeted questions validated). |
 | **Maturity / risks of experimental features** | Enabling `chatCompletions`, bugs encountered (panic without master key, baseUrl required for Mistral), no chat SDK wrapper: we document the cost and workarounds. |
 | **Quality on complex PDFs** | A real paper with tables and sections; validation that numbers (GSM8K, Humaneval, Table 4 FR) and nuance (routing not domain-specialized) are correctly retrieved. |
 | **Mistral integration (embedding + chat)** | Mistral embedding for chunks; chat configured with Mistral source + baseUrl to avoid routing to OpenAI; a single coherent stack. |
@@ -69,6 +69,26 @@ The index is ready for full-text and semantic search with the same Mistral model
 | **search_chunks_for_query.py** | Runs **hybrid search** (same parameters as chat uses internally) on `pdf_chunks` and prints returned chunks (id, title, chunk_text excerpt). | Since chat does not return sources (tools disabled), this script acts as a **proxy** to see “which chunks were (or would have been) sent to the LLM”. |
 
 **Search mode actually used by chat:** **hybrid** (keyword + semantic, embedder `mistral`). Chunks sent to the LLM are from this hybrid search, formatted per the index chat `documentTemplate`.
+
+### 2.4 Search latency benchmarks
+
+Two scripts run **50 searches** on `pdf_chunks` and report mean / p50 / p95 latency (ms). Same query: *"architecture Mixtral experts routing"*, index with 43 chunks.
+
+**Keyword-only** (`audit/benchmark_keyword_latency.py`): full-text only, no embedder.
+
+| Metric | Keyword | Hybrid |
+|--------|--------|--------|
+| **Mean** | 3 ms | 335 ms |
+| **p50 (median)** | 2 ms | 194 ms |
+| **p95** | 9 ms | 727 ms |
+
+**Hybrid** (`audit/benchmark_hybrid_latency.py`): same params as chat (`semanticRatio` 0.5, embedder `mistral`). Latency includes the **Mistral embedder API round-trip** plus Meilisearch search.
+
+**Due diligence one-liners:**
+- *"~2 ms median for keyword-only search on a complex document."*
+- *"~200 ms median for hybrid search on a complex document — includes Mistral embedder round-trip."*
+
+Re-run: `uv run python complex_pdf_test/audit/benchmark_keyword_latency.py` and `benchmark_hybrid_latency.py` to reproduce or refresh numbers.
 
 ---
 
@@ -161,6 +181,8 @@ The index is ready for full-text and semantic search with the same Mistral model
 | chat/ask_chat.py | Chat | Send question to chat, parse SSE stream, print response. |
 | **audit/** | | Inspection |
 | audit/search_chunks_for_query.py | Audit | Run hybrid search (same as chat) and print returned chunks. |
+| audit/benchmark_hybrid_latency.py | Audit | Run 50 hybrid searches, report mean / p50 / p95 latency (ms). |
+| audit/benchmark_keyword_latency.py | Audit | Run 50 keyword-only searches, report mean / p50 / p95 latency (ms). |
 | **run_pipeline.py** | Orchestration | parse → normalize → chunk → build → JSON; `--load` for Meilisearch. |
 | **mistral-doc.pdf** | Data | Test PDF (Mixtral of Experts paper). |
 | **mistral-doc.chunks.json** | Data | Pipeline output (43 chunks). |

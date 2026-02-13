@@ -8,7 +8,7 @@ Due diligence repo: **Meilisearch + Mistral** — hybrid search, embeddings, and
 
 - **Simple SDK test** (`simple_sdk_test/`): import JSON, configure the Mistral embedder, run keyword, semantic, and **hybrid** search. Baseline to confirm the SDK and vector search work.
 - **Complex PDF pipeline** (`complex_pdf_test/`): real PDF (e.g. Mixtral paper) → **Docling** parse → normalize → chunk by sections/size → build JSON → load into Meilisearch. Validates the full chain on rich layout (tables, sections), not just pre-built data.
-- **Native chat (Option A)**: Meilisearch’s **experimental** `chatCompletions` — one API call for retrieval + LLM (Mistral). We enable the feature, configure a workspace with Mistral `baseUrl`, and stream answers. No custom search→prompt→LLM loop.
+- **Native chat (Option A)**: Meilisearch has a **chat** API: you send a question, it runs the search and calls an LLM (e.g. Mistral), then streams back the LLM’s answer. That **chat API** is what Meilisearch marks as **experimental** (unstable, may change). Indexing PDF chunks, hybrid search, embeddings — all of that is normal/stable; only the “question → synthesized answer” endpoint is experimental.
 - **Audit**: script to see which chunks hybrid search returns for a query (proxy for “what the chat sent to the LLM”), since the chat response doesn’t expose sources.
 - **SDK and API limits**: we checked the Meilisearch Python SDK (e.g. `index.py`): only **JSON / NDJSON / CSV** (and list-of-dicts); no raw PDF/DOCX ingestion. Chat has no dedicated SDK method — HTTP + SSE parsing. All of that is documented.
 
