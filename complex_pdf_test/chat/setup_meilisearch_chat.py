@@ -1,5 +1,5 @@
 """
-Setup Meilisearch for conversational search (Option A – native chat).
+Setup Meilisearch for conversational search (native chat).
 
 Runs entirely via the Meilisearch API (no curl needed). Does:
   1. Enable experimental feature chatCompletions
@@ -14,11 +14,11 @@ MEILISEARCH_API_KEY to that same key in .env (otherwise chat/completions panics)
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Project root (complex_pdf_test/chat/ -> parents[2])
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Ensure .env is loaded from project root (cwd may differ when run via uv/IDE)
 from dotenv import load_dotenv
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -101,7 +101,6 @@ def main() -> None:
 
     # 3. Create/update workspace (Mistral)
     print(f"{LOG_PREFIX} Creating/updating workspace '{WORKSPACE_UID}' (Mistral)...")
-    # baseUrl forces Meilisearch to call Mistral instead of defaulting to OpenAI
     workspace_body = {
         "source": "mistral",
         "apiKey": settings.mistral_api_key,
@@ -119,7 +118,7 @@ def main() -> None:
     r.raise_for_status()
     print(f"{LOG_PREFIX} Workspace '{WORKSPACE_UID}' ready.")
 
-    print(f"{LOG_PREFIX} Done. Run: python complex_pdf_test/ask_chat.py \"Ta question\"")
+    print(f"{LOG_PREFIX} Done. Run: python complex_pdf_test/chat/ask_chat.py \"Ta question\"")
 
 
 if __name__ == "__main__":

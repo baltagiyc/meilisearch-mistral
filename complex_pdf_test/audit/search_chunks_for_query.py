@@ -1,20 +1,18 @@
 """
 Run the same search the chat uses (hybrid with Mistral embedder) and print the chunks returned.
 
-This is a proxy for "which chunks were sent to the LLM": the chat does hybrid search
-internally; we don't get the exact chunks in the chat response (unless we use
-_meiliSearchSources and parse the stream). Running this with the same question
-shows what Meilisearch would retrieve.
+Proxy for "which chunks were sent to the LLM".
 
 Usage:
-  python complex_pdf_test/search_chunks_for_query.py "Ta question"
-  python complex_pdf_test/search_chunks_for_query.py "Ta question" --limit 10
+  python complex_pdf_test/audit/search_chunks_for_query.py "Ta question"
+  python complex_pdf_test/audit/search_chunks_for_query.py "Ta question" --limit 10
 """
 
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Project root (complex_pdf_test/audit/ -> parents[2])
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -48,7 +46,6 @@ def main() -> None:
     client = meilisearch.Client(settings.meilisearch_url, settings.meilisearch_api_key or "")
     index = client.index(PDF_INDEX)
 
-    # Same search mode the chat uses: hybrid (keyword + semantic) with Mistral embedder
     results = index.search(
         query,
         {

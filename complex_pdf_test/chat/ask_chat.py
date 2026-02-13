@@ -2,18 +2,18 @@
 Ask a question via Meilisearch native chat (Option A).
 
 Calls POST /chats/{workspace}/chat/completions (streaming) and prints the reply.
-No curl: everything via this script.
 
 Usage:
-  python complex_pdf_test/ask_chat.py "Quelle est l'architecture de Mixtral ?"
-  python complex_pdf_test/ask_chat.py   # reads question from stdin
+  python complex_pdf_test/chat/ask_chat.py "Quelle est l'architecture de Mixtral ?"
+  python complex_pdf_test/chat/ask_chat.py   # reads question from stdin
 """
 
 import json
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Project root (complex_pdf_test/chat/ -> parents[2])
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -25,7 +25,6 @@ from config import load_settings
 
 WORKSPACE_UID = "mistral-pdf"
 
-# Recommended Meilisearch tools (from doc)
 MEILI_TOOLS = [
     {"type": "function", "function": {"name": "_meiliSearchProgress", "description": "Reports real-time search progress to the user"}},
     {"type": "function", "function": {"name": "_meiliSearchSources", "description": "Provides sources and references for the information"}},
@@ -42,8 +41,6 @@ def ask(question: str, debug: bool = False) -> None:
     url = f"{base}/chats/{WORKSPACE_UID}/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings.meilisearch_api_key}"}
 
-    # Minimal body: model, messages, stream. "tools" can trigger a panic in Meilisearch v1.15
-    # (unwrap on None at chat_completions.rs:449). Omit tools or use Meilisearch v1.15.1+ / latest.
     body = {
         "model": settings.mistral_chat_model,
         "messages": [{"role": "user", "content": question}],
@@ -63,7 +60,6 @@ def ask(question: str, debug: bool = False) -> None:
     if not r.ok:
         raise SystemExit(f"Chat API error {r.status_code}: {r.text[:500]}")
 
-    # Parse SSE (OpenAI-compatible stream)
     full_content: list[str] = []
     for line in r.iter_lines(decode_unicode=True):
         if not line or not line.startswith("data: "):
@@ -81,7 +77,6 @@ def ask(question: str, debug: bool = False) -> None:
             continue
         if debug:
             print(f"[debug] chunk keys: {list(data.keys())}", file=sys.stderr)
-        # Meilisearch may send error events (event_id, type, error) instead of OpenAI format
         if "error" in data:
             err = data["error"]
             msg = err if isinstance(err, str) else err.get("message", str(err))

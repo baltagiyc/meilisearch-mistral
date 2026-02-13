@@ -146,21 +146,25 @@ L’index est donc prêt pour la recherche full-text et sémantique, avec le mê
 
 ## 7. Récapitulatif des fichiers `complex_pdf_test/`
 
-| Fichier | Type | Rôle en une phrase |
-|---------|------|--------------------|
-| **parse_pdf.py** | Pipeline | PDF → markdown via Docling. |
-| **normalize_elements.py** | Pipeline | Normalisation du texte (regex). |
-| **chunk_pdf.py** | Pipeline | Découpage par sections puis par taille/overlap. |
-| **build_documents.py** | Pipeline | Construction des docs (chunks) au format cible. |
-| **schemas.py** | Données | Modèles RawElement, Chunk, chunk_to_meilisearch_doc. |
+| Dossier / Fichier | Type | Rôle en une phrase |
+|-------------------|------|--------------------|
+| **pipeline/** | | PDF → list de chunk dicts |
+| pipeline/parse_pdf.py | Pipeline | PDF → markdown via Docling. |
+| pipeline/normalize_elements.py | Pipeline | Normalisation du texte (regex). |
+| pipeline/chunk_pdf.py | Pipeline | Découpage par sections puis par taille/overlap. |
+| pipeline/build_documents.py | Pipeline | Construction des docs (chunks) au format cible. |
+| pipeline/schemas.py | Données | Modèles RawElement, Chunk, chunk_to_meilisearch_doc. |
+| **load/** | | Indexation Meilisearch |
+| load/load_to_meilisearch.py | Indexation | Configure `pdf_chunks` (embedder Mistral) et charge les documents. |
+| **chat/** | | Chat natif (Option A) |
+| chat/setup_meilisearch_chat.py | Chat | Active chatCompletions, configure l’index pour le chat, crée le workspace Mistral (avec baseUrl). |
+| chat/ask_chat.py | Chat | Envoie une question au chat, parse le stream SSE, affiche la réponse. |
+| **audit/** | | Inspection |
+| audit/search_chunks_for_query.py | Audit | Lance une recherche hybride (même logique que le chat) et affiche les chunks retournés. |
 | **run_pipeline.py** | Orchestration | Enchaîne parse → normalize → chunk → build → JSON ; option `--load` pour Meilisearch. |
-| **load_to_meilisearch.py** | Indexation | Configure `pdf_chunks` (embedder Mistral) et charge les documents. |
-| **setup_meilisearch_chat.py** | Chat | Active chatCompletions, configure l’index pour le chat, crée le workspace Mistral (avec baseUrl). |
-| **ask_chat.py** | Chat | Envoie une question au chat, parse le stream SSE, affiche la réponse. |
-| **search_chunks_for_query.py** | Audit | Lance une recherche hybride (même logique que le chat) et affiche les chunks retournés. |
 | **mistral-doc.pdf** | Donnée | PDF de test (paper Mixtral of Experts). |
 | **mistral-doc.chunks.json** | Donnée | Sortie du pipeline (43 chunks). |
-| **README.md** | Doc | Instructions d’exécution du pipeline et du chat. |
+| **README.md** | Doc | Instructions et layout (pipeline, load, chat, audit). |
 | **BILAN.md** | Doc | Ce document. |
 
 ---

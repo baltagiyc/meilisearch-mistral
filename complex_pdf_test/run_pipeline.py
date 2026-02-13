@@ -12,10 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from complex_pdf_test.chunk_pdf import chunk_text
-from complex_pdf_test.build_documents import build_documents
-from complex_pdf_test.normalize_elements import normalize_text
-from complex_pdf_test.parse_pdf import parse_pdf
+from complex_pdf_test.pipeline import parse_pdf, normalize_text, chunk_text, build_documents
+from complex_pdf_test.load import load_chunks_into_meilisearch
 
 LOG_PREFIX = "[run_pipeline]"
 
@@ -65,7 +63,6 @@ def run_pipeline(
 
     if load_to_meilisearch:
         print(f"{LOG_PREFIX} --- Load to Meilisearch (index pdf_chunks) ---")
-        from complex_pdf_test.load_to_meilisearch import load_chunks_into_meilisearch
         load_chunks_into_meilisearch(documents)
 
     elapsed = time.perf_counter() - total_start
