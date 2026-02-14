@@ -13,6 +13,8 @@ End-to-end test with **real PDFs** (text, tables, figures) for the Meilisearch +
 
 **Output:** a JSON file whose root is an array of chunk objects (`id`, `doc_id`, `chunk_text`, `title`, `page`, `element_type`, `source_file`).
 
+**All test results (43 chunks + 10k docs):** [RESULTS.md](RESULTS.md).
+
 Run from project root:
 
 ```bash

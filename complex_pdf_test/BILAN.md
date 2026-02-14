@@ -208,6 +208,7 @@ Script `scale_test/run_scale_test.py`: index **10 000 documents** (from 43 chunk
 | **mistral-doc.pdf** | Data | Test PDF (Mixtral of Experts paper). |
 | **mistral-doc.chunks.json** | Data | Pipeline output (43 chunks). |
 | **README.md** | Doc | Instructions and layout (pipeline, load, chat, audit). |
+| **RESULTS.md** | Doc | All test results (43 chunks + 10k): latency, ingestion, comparison, charts, re-run commands. |
 | **BILAN.md** | Doc | This document. |
 
 ---
