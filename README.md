@@ -21,7 +21,7 @@ So: hybrid search in production-like conditions, real PDF → index → conversa
 | Area | Purpose |
 |------|---------|
 | `simple_sdk_test/` | Keyword, semantic, hybrid search on pre-built JSON; Mistral embedder. |
-| `complex_pdf_test/` | PDF pipeline (parse → chunk → index), optional load to Meilisearch, native chat setup + ask, audit script. See [complex_pdf_test/README.md](complex_pdf_test/README.md) and [BILAN.md](complex_pdf_test/BILAN.md). |
+| `complex_pdf_test/` | PDF pipeline (parse → chunk → index), optional load to Meilisearch, native chat setup + ask, audit scripts, **scale_test** (10k docs, ingestion + latency). See [complex_pdf_test/README.md](complex_pdf_test/README.md) and [BILAN.md](complex_pdf_test/BILAN.md). |
 | `mistral_key_tests/` | Quick checks: API key, list models, list embedding models. |
 | `config/` | Shared settings (e.g. `.env` loading). |
 

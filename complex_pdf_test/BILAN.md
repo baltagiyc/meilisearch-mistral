@@ -90,6 +90,27 @@ Two scripts run **50 searches** on `pdf_chunks` and report mean / p50 / p95 late
 
 Re-run: `uv run python complex_pdf_test/audit/benchmark_keyword_latency.py` and `benchmark_hybrid_latency.py` to reproduce or refresh numbers.
 
+### 2.5 Scale test (10k documents)
+
+Script `scale_test/run_scale_test.py`: index **10 000 documents** (from 43 chunks, index `pdf_chunks_scale`) in batches of 1000, then run 50 hybrid searches. Measures ingestion throughput and search latency at scale.
+
+**Results** (single run, Feb 2026):
+
+| Phase | Result |
+|-------|--------|
+| **Ingestion** | 10 000 docs in **776.9 s** → **12.9 docs/s** (excl. initial settings ~533 s). Batches of 1000; bottleneck = Mistral embedder API. |
+| **Hybrid search** (50 req, same query) | **Mean 758 ms** \| **p50 206 ms** \| **p95 2997 ms** |
+
+**Comparison with 43 chunks (section 2.4):**
+
+| Metric | 43 chunks | 10k docs |
+|--------|-----------|----------|
+| Mean | 335 ms | 758 ms |
+| p50 | 194 ms | 206 ms |
+| p95 | 727 ms | 2997 ms |
+
+**Takeaway:** p50 stable (~200 ms); mean and p95 degrade at 10k (tail latency). Ingestion ~12.9 docs/s; for larger corpora, consider batch embedding or async. Re-run: `uv run python complex_pdf_test/scale_test/run_scale_test.py`.
+
 ---
 
 ## 3. Difficulties observed (critical view)
