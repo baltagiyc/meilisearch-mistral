@@ -8,9 +8,12 @@ End-to-end test with **real PDFs** (text, tables, figures) for the Meilisearch +
 - **pipeline/** — parse, normalize, chunk, build, schemas (PDF → list of chunk dicts)
 - **load/** — index `pdf_chunks` + Mistral embedder
 - **chat/** — Meilisearch native chat (setup workspace, ask questions)
-- **audit/** — e.g. see which chunks hybrid search returns for a query
+- **audit/** — which chunks hybrid returns, keyword/hybrid latency benchmarks
+- **scale_test/** — max scalability: index 10k docs in batches, measure ingestion throughput and search p50/p95
 
 **Output:** a JSON file whose root is an array of chunk objects (`id`, `doc_id`, `chunk_text`, `title`, `page`, `element_type`, `source_file`).
+
+**All test results (43 chunks + 10k docs):** [RESULTS.md](RESULTS.md).
 
 Run from project root:
 
